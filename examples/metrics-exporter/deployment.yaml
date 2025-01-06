@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-exporter
+  labels:
+    app: metrics-exporter
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: metrics-exporter
+  template:
+    metadata:
+      labels:
+        app: metrics-exporter
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - metrics-exporter
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: metrics-exporter
+        image: victoriametrics/victoria-metrics:stable
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8428
+          name: http
+

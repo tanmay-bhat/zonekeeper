@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zonekeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zonekeeper
+  template:
+    metadata:
+      labels:
+        app: zonekeeper
+    spec:
+      serviceAccountName: zonekeeper
+      containers:
+      - name: zonekeeper
+        image: tanmaybhat/zonekeeper:1.0.1
+        ports:
+        - containerPort: 8081
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zonekeeper
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zonekeeper
+subjects:
+  - kind: ServiceAccount
+    name: zonekeeper
+    namespace: monitoring
+roleRef:
+  kind: ClusterRole
+  name: zonekeeper
+  apiGroup: rbac.authorization.k8s.io
+
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: zonekeeper
+  namespace: monitoring

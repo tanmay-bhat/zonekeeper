@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vmagent-zone-2a
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vmagent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vmagent
+    spec:
+      serviceAccountName: vmagent
+      containers:
+      - args:
+        - -httpListenAddr=:8429
+        - -promscrape.config=/etc/vmagent/config/promscrape.yaml
+        - -remoteWrite.label=vmagent=zone-2a
+        - -remoteWrite.url=http://vmsingle-victoria-metrics-server:8429/api/v1/write
+        image: victoriametrics/vmagent:v1.106.0
+        imagePullPolicy: IfNotPresent
+        name: vmagent
+        ports:
+        - containerPort: 8429
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /etc/vmagent/config
+          name: config
+          readOnly: true
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: promscrape-zone-2a
+        name: config
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: promscrape-zone-2a
+data:
+  promscrape.yaml: |
+    global:
+      scrape_interval: 30s
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_topology_kubernetes_io_zone]
+          action: keep
+          regex: us-west-2a
+    scrape_configs:
+    - job_name: metrics-exporter
+      metrics_path: /metrics
+      relabel_configs:
+      - action: keep
+        source_labels: [__meta_kubernetes_pod_label_app]
+        regex: metrics-exporter
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - target_label: job
+        replacement: monitoring/metrics-exporter
+      - target_label: endpoint
+        replacement: http
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          own_namespace: false
+          names:
+          - monitoring
+        selectors:
+        - role: pod
+          label: app=metrics-exporter
+          field: ""
+---
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vmagent
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vmagent
+rules:
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - nodes/metrics
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  - configmaps
+  - namespaces
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  - extensions
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+- nonResourceURLs:
+  - /metrics
+  - /metrics/resources
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - route.openshift.io
+  - image.openshift.io
+  resources:
+  - routers/metrics
+  - registry/metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vmagent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vmagent
+subjects:
+- kind: ServiceAccount
+  name: vmagent
+  namespace: monitoring

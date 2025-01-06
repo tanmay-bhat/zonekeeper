@@ -48,7 +48,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Get zone from node labels
 	zone, exists := node.Labels[podZoneLabel]
 	if !exists {
-		logger.Info("Zone label not found on node", "node", pod.Spec.NodeName)
+		logger.Info(fmt.Sprintf("Zone label not found on node %s", pod.Spec.NodeName))
 		return ctrl.Result{}, nil
 	}
 

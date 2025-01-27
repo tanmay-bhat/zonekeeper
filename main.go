@@ -8,11 +8,14 @@ import (
 	"strings"
 
 	controller "github.com/tanmay-bhat/zonekeeper/controllers"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -42,8 +45,10 @@ func getWatchNamespace() string {
 
 func main() {
 	var probeAddr string
+	var podLabelSelector string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&podLabelSelector, "pod-label-selector", "", "The label selector for pods to watch, key=value, multiple can be separated by comma")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -58,35 +63,56 @@ func main() {
 
 	watchNamespace := getWatchNamespace()
 	namespaceConfigs := make(map[string]cache.Config)
+	labelSelectorConfig := make(map[string]string)
 
 	if watchNamespace == "" {
 		namespaceConfigs[""] = cache.Config{}
 	}
 
-	if strings.Contains(watchNamespace, ",") {
-		setupLog.Info("manager set up with multiple namespaces", "namespaces", watchNamespace)
-		namespaces := strings.Split(watchNamespace, ",")
-		for _, ns := range namespaces {
-			if ns != "" {
-				ns := strings.TrimSpace(ns)
-				namespaceConfigs[ns] = cache.Config{}
-			}
+	namespaces := strings.Split(watchNamespace, ",")
+	setupLog.Info("manager set up with namespaces", "namespaces", watchNamespace)
+
+	for _, ns := range namespaces {
+		ns = strings.TrimSpace(ns)
+		if ns != "" {
+			namespaceConfigs[ns] = cache.Config{}
 		}
-	} else {
-		setupLog.Info("manager set up with single namespace", "namespace", watchNamespace)
-		ns := strings.TrimSpace(watchNamespace)
-		namespaceConfigs[ns] = cache.Config{}
+	}
+
+	if podLabelSelector != "" {
+		setupLog.Info("manager set up with pod label selector", "label", podLabelSelector)
+
+		labels := strings.Split(podLabelSelector, ",")
+		for _, label := range labels {
+			label = strings.TrimSpace(label)
+			kv := strings.Split(label, "=")
+			if len(kv) != 2 {
+				setupLog.Error(fmt.Errorf("invalid label selector"), "invalid label selector", "label", label)
+				os.Exit(1)
+			}
+			labelSelectorConfig[kv[0]] = kv[1]
+		}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsserver.Options{BindAddress: "0"},
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: "0",
+		},
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
-		Cache:                  cache.Options{DefaultNamespaces: namespaceConfigs},
-		LeaderElection:         true,
-		LeaderElectionID:       "zonekeeper-leader-election",
+		Cache: cache.Options{
+			DefaultNamespaces: namespaceConfigs,
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Pod{}: {
+					Label: labels.SelectorFromSet(labelSelectorConfig),
+				},
+			},
+		},
+		LeaderElection:   true,
+		LeaderElectionID: "zonekeeper-leader-election",
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)

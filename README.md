@@ -29,9 +29,20 @@ Once the deployment is running, Zonekeeper will start adding availability zone l
 ...
 ```
 
+
+### Namespaces Filtering
+It is possible to watch over only certain namespace(s) by specifying them with env WATCH_NAMESPACE(comma seperated). By default it will watch over all namespaces.
+
+### Label Selectors
+Zonekeeper can be configured to watch only pods with specific labels by specifying them with with argument `pod-label-selector`. For example, to watch only pods with label `app=nginx`:
+```
+./zonekeeper --pod-label-selector=app=nginx
+```
+Multiple labels can be specified by separating them with comma. For example, to watch only pods with labels `app=nginx` and `env=prod`:
+```
+./zonekeeper --pod-label-selector=app=nginx,env=prod
+```
+
 ### Running The Example Stack
 
 Refer to `examples/README.md` for instructions on running the example stack which includes `metrics-exporter`, `vmstack` and `zonekeeper`.
-
-### Namespaces Filtering
-- It is possible to watch over only certain namespace(s) by specifying them with env WATCH_NAMESPACE(comma seperated). By default it will watch over all namespaces.

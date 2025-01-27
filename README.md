@@ -32,3 +32,6 @@ Once the deployment is running, Zonekeeper will start adding availability zone l
 ### Running The Example Stack
 
 Refer to `examples/README.md` for instructions on running the example stack which includes `metrics-exporter`, `vmstack` and `zonekeeper`.
+
+### Namespaces Filtering
+- It is possible to watch over only certain namespace(s) by specifying them with env WATCH_NAMESPACE(comma seperated). By default it will watch over all namespaces.

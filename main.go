@@ -84,6 +84,8 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		Cache:                  cache.Options{DefaultNamespaces: namespaceConfigs},
+		LeaderElection:         true,
+		LeaderElectionID:       "zonekeeper-leader-election",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

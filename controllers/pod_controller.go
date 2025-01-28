@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -10,6 +11,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+)
+
+var (
+	processedNodes   = make(map[string]struct{})
+	processedNodesMu sync.Mutex
 )
 
 type PodReconciler struct {
@@ -23,6 +29,8 @@ const (
 
 func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := ctrl.Log.WithName("zonekeeper")
+
+	ZonekeeperReconciliationsTotal.WithLabelValues("Pod", "corev1", "v1", req.Namespace).Inc()
 
 	// Fetch the Pod
 	var pod corev1.Pod
@@ -46,8 +54,16 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, fmt.Errorf("failed to get node %s: %w", pod.Spec.NodeName, err)
 	}
 
+	processedNodesMu.Lock()
+	defer processedNodesMu.Unlock()
+	if _, exists := processedNodes[node.Name]; !exists {
+		ZonekeeperNodesWatchCount.WithLabelValues(node.Labels[podZoneLabel]).Inc()
+		processedNodes[node.Name] = struct{}{}
+	}
+
 	// Get zone from node labels
 	zone, exists := node.Labels[podZoneLabel]
+
 	if !exists {
 		logger.Error(nil, "node missing required zone label",
 			"node", node.Name,
@@ -81,9 +97,10 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		logger.Error(err, "failed to patch pod",
 			"pod", req.NamespacedName,
 			"zone", zone)
+		ZonekeeperLabelUpdateFailedCountTotal.WithLabelValues(zone, req.Namespace).Inc()
 		return ctrl.Result{}, fmt.Errorf("failed to patch pod: %w", err)
 	}
-
+	ZonekeeperLabelUpdateCountTotal.WithLabelValues(zone, req.Namespace).Inc()
 	return ctrl.Result{}, nil
 }
 

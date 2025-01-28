@@ -47,9 +47,11 @@ func getWatchNamespace() string {
 func main() {
 	var probeAddr string
 	var podLabelSelector string
+	var metricsPort int
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&podLabelSelector, "pod-label-selector", "", "The label selector for pods to watch, key=value, multiple can be separated by comma")
+	flag.IntVar(&metricsPort, "metrics-port", 8080, "The port the metric endpoint binds to.")
 	opts := zap.Options{
 		Development:     false,
 		StacktraceLevel: zapcore.FatalLevel,
@@ -96,10 +98,12 @@ func main() {
 		}
 	}
 
+	controller.RegisterMetrics()
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
-			BindAddress: "0",
+			BindAddress: fmt.Sprintf(":%d", metricsPort),
 		},
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,

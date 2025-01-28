@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// PodReconciler reconciles Pod objects
 type PodReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -21,8 +20,6 @@ type PodReconciler struct {
 const (
 	podZoneLabel = "topology.kubernetes.io/zone"
 )
-
-// +kubebuilder:rbac:groups=core,resources=pods;nodes,verbs=get;list;watch;update;patch
 
 func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := ctrl.Log.WithName("zonekeeper")
@@ -35,25 +32,34 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	// Skip if pod hasn't been scheduled yet
 	if pod.Spec.NodeName == "" {
-		logger.V(1).Info("Pod not yet scheduled")
+		logger.V(1).Info("pod not yet scheduled",
+			"pod", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
 	// Fetch the Node
 	var node corev1.Node
 	if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
+		logger.Error(err, "failed to get node",
+			"node", pod.Spec.NodeName,
+			"pod", req.NamespacedName)
 		return ctrl.Result{}, fmt.Errorf("failed to get node %s: %w", pod.Spec.NodeName, err)
 	}
 
 	// Get zone from node labels
 	zone, exists := node.Labels[podZoneLabel]
 	if !exists {
-		logger.Info(fmt.Sprintf("Zone label not found on node %s", pod.Spec.NodeName))
+		logger.Error(nil, "node missing required zone label",
+			"node", node.Name,
+			"required_label", podZoneLabel)
 		return ctrl.Result{}, nil
 	}
 
 	// Check if update is needed
 	if pod.Labels[podZoneLabel] == zone {
+		logger.V(2).Info("pod zone label already up to date",
+			"pod", req.NamespacedName,
+			"zone", zone)
 		return ctrl.Result{}, nil
 	}
 
@@ -66,17 +72,21 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 	pod.Labels[podZoneLabel] = zone
 
-	logger.Info(fmt.Sprintf("Updating pod %s/%s with zone label '%s'", pod.Namespace, pod.Name, zone))
+	logger.Info("updating pod zone label",
+		"pod", req.NamespacedName,
+		"zone", zone)
 
 	// Use Patch instead of Update to handle conflicts
 	if err := r.Patch(ctx, &pod, client.MergeFrom(podCopy)); err != nil {
+		logger.Error(err, "failed to patch pod",
+			"pod", req.NamespacedName,
+			"zone", zone)
 		return ctrl.Result{}, fmt.Errorf("failed to patch pod: %w", err)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager and filter only pods that are scheduled
 func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Pod{}).

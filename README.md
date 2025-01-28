@@ -46,3 +46,11 @@ Multiple labels can be specified by separating them with comma. For example, to 
 ### Running The Example Stack
 
 Refer to `examples/README.md` for instructions on running the example stack which includes `metrics-exporter`, `vmstack` and `zonekeeper`.
+
+### Metrics
+Zonekeeper exposes metrics the below on `/metrics` endpoint by default at port 8080 : 
+- `zonekeeper_label_updates_failed_total` : The total number of pod label updates that failed.
+- `zonekeeper_label_updates_total` : The total number of pod label updates that succeeded.
+- `zonekeeper_nodes_watched` : The total number nodes that are being watched by zonekeeper.
+- `zonekeeper_k8s_reconciliations_total` : The total number of kubernetes reconciliations that have been performed by zonekeeper.
+

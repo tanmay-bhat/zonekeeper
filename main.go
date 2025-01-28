@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	controller "github.com/tanmay-bhat/zonekeeper/controllers"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,7 +51,8 @@ func main() {
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&podLabelSelector, "pod-label-selector", "", "The label selector for pods to watch, key=value, multiple can be separated by comma")
 	opts := zap.Options{
-		Development: true,
+		Development:     false,
+		StacktraceLevel: zapcore.FatalLevel,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -109,7 +111,7 @@ func main() {
 				},
 			},
 		},
-		LeaderElection:   true,
+		LeaderElection:   false,
 		LeaderElectionID: "zonekeeper-leader-election",
 	})
 

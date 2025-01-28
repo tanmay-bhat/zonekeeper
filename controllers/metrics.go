@@ -8,21 +8,21 @@ import (
 var (
 	ZonekeeperLabelUpdateFailedCountTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "zonekeeper_label_updates_failed_count_total",
+			Name: "zonekeeper_label_updates_failed_total",
 			Help: "Total number of pods the controller failed to apply zone labels to",
 		},
 		[]string{"zone", "namespace"},
 	)
 	ZonekeeperLabelUpdateCountTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "zonekeeper_label_updates_count_total",
+			Name: "zonekeeper_label_updates_total",
 			Help: "Total number of pods the controller successfully updated zone labels for",
 		},
 		[]string{"zone", "namespace"},
 	)
 	ZonekeeperNodesWatchCount = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "zonekeeper_nodes_watch_count",
+			Name: "zonekeeper_nodes_watched",
 			Help: "Total number of nodes in watch by the controller",
 		},
 		[]string{"zone"},
